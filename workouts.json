@@ -1,0 +1,120 @@
+{
+  "meta": {
+    "athlete": "Edwin",
+    "profile": "177cm / 77kg · 등 강점 · 가슴 약점",
+    "goal": "컷팅 — 체지방 ~12%, 빡! 잡힌 복근",
+    "split": "3분할(PPL) + 하이록스 · 가슴 주 2회",
+    "protein_target_g": 154,
+    "updated": "2026-05-28"
+  },
+  "daily_reminder": [
+    "단백질 154g (체중 77 x 2g, 컷팅)",
+    "액체칼로리 X (라떼/주스/탄산 No)",
+    "매끼 단백질 손바닥 1개분",
+    "밥/면/빵은 평소의 반",
+    "술 줄이기 (마무리 라면 X)",
+    "물 2.5L+",
+    "수면 7시간+"
+  ],
+  "days": {
+    "monday": {
+      "title": "월요일 — Push (가슴 주력)",
+      "tag": "Push",
+      "duration": "70~85분",
+      "warmup": "로잉 500m @ 2:10~2:15 (zone 2) → 스키어그 3~5분 가볍게 → 풀업 5~10개",
+      "main": [
+        { "name": "인클라인 덤벨 프레스", "scheme": "4 x 8~10  ← 최우선" },
+        { "name": "플랫 벤치프레스", "scheme": "3 x 8~10" },
+        { "name": "OHP", "scheme": "3 x 6~8 (40kg 라인 점증)" },
+        { "name": "딥스", "scheme": "3 x 최대" },
+        { "name": "사이드 레터럴 레이즈", "scheme": "3 x 15" },
+        { "name": "트라이셉 푸시다운", "scheme": "3 x 12" },
+        { "name": "행잉 레그레이즈", "scheme": "3 x 10~15" }
+      ],
+      "note": "윗가슴 우선. 가슴 짜내는 감각 의식 (어깨/삼두로 들지 말기)"
+    },
+    "tuesday": {
+      "title": "화요일 — 하이록스 컨디셔닝",
+      "tag": "HYROX",
+      "duration": "40~50분",
+      "warmup": "로잉 500m 2:10 페이스",
+      "main": [
+        { "name": "로잉", "scheme": "1km @ 1:55" },
+        { "name": "슬레드 푸시", "scheme": "125kg x 50m  x 3~4세트" },
+        { "name": "스키어그", "scheme": "500m" },
+        { "name": "케틀벨 스윙", "scheme": "20개 x 3세트" }
+      ],
+      "note": "OHP는 월/금 했으니 SKIP"
+    },
+    "wednesday": {
+      "title": "수요일 — Pull (등/이두)",
+      "tag": "Pull",
+      "duration": "50~60분",
+      "warmup": "풀업 5~10개",
+      "main": [
+        { "name": "데드리프트 120kg", "scheme": "3 x 5  (1RM 150의 80%)" },
+        { "name": "풀업", "scheme": "3 x 8~10" },
+        { "name": "랫풀다운", "scheme": "3 x 10~12" },
+        { "name": "원암 케이블 풀다운", "scheme": "3 x 12 (양쪽)" },
+        { "name": "시티드 케이블 로우", "scheme": "3 x 10~12" },
+        { "name": "페이스풀", "scheme": "3 x 15" },
+        { "name": "바벨 컬", "scheme": "3 x 10" },
+        { "name": "케이블 크런치", "scheme": "3 x 15" }
+      ],
+      "note": "데드 PR 도전 금지. 컷팅 중 회복 어려움"
+    },
+    "thursday": {
+      "title": "목요일 — 하이록스 컨디셔닝",
+      "tag": "HYROX",
+      "duration": "40~50분",
+      "warmup": "스키어그 500m",
+      "main": [
+        { "name": "스키어그", "scheme": "1km" },
+        { "name": "로잉 인터벌", "scheme": "500m x 4세트 @ 1:45" },
+        { "name": "슬레드 풀 (로프)", "scheme": "75~100kg x 30m x 3세트" },
+        { "name": "버피", "scheme": "10개 x 3세트" }
+      ],
+      "note": "화요일과 다르게 인터벌 위주"
+    },
+    "friday": {
+      "title": "금요일 — Legs + 코어",
+      "tag": "Legs",
+      "duration": "50~60분",
+      "warmup": "풀업 5~10개 + 가벼운 스쿼트",
+      "main": [
+        { "name": "백 스쿼트", "scheme": "4 x 6~8" },
+        { "name": "루마니안 데드", "scheme": "3 x 8~10" },
+        { "name": "레그프레스 또는 런지", "scheme": "3 x 12" },
+        { "name": "카프레이즈", "scheme": "3 x 15" },
+        { "name": "플랭크", "scheme": "3 x 60초" },
+        { "name": "행잉 레그레이즈", "scheme": "3 x 10~15" }
+      ],
+      "note": "하체 빠뜨리면 기초대사량 안 올라 컷팅 효율 ↓"
+    },
+    "saturday": {
+      "title": "토요일 — Push (가슴 2회차, 짧게)",
+      "tag": "Push",
+      "duration": "60~75분",
+      "warmup": "로잉 500m @ 2:10~2:15 (zone 2) → 스키어그 3~5분 가볍게 → 풀업 5~10개",
+      "main": [
+        { "name": "인클라인 덤벨 프레스", "scheme": "4 x 10~12  (월요일보다 약간 가볍게)" },
+        { "name": "케이블 플라이 (인클라인)", "scheme": "4 x 12~15" },
+        { "name": "딥스", "scheme": "3 x 최대" },
+        { "name": "푸시업", "scheme": "3 x 최대 (마무리)" },
+        { "name": "사이드 레터럴", "scheme": "3 x 15" }
+      ],
+      "note": "윗가슴 + 모양 작업 위주. 무게보다 펌핑"
+    },
+    "sunday": {
+      "title": "일요일 — 휴식 🛌",
+      "tag": "Rest",
+      "duration": "—",
+      "warmup": "",
+      "main": [
+        { "name": "스트레칭 / 산책", "scheme": "선택" },
+        { "name": "술자리 피하는 날로 활용", "scheme": "" }
+      ],
+      "note": "회복이 근성장과 지방감량의 일부. 무리해서 운동하지 말 것"
+    }
+  }
+}

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f1115" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>운동봇</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #181b22;
+    --card2: #1f232c;
+    --line: #2a2f3a;
+    --txt: #e9edf4;
+    --muted: #8b93a3;
+    --accent: #ff5b3b;
+    --accent2: #ffb03b;
+    --ok: #35d07f;
+    --push: #ff5b3b;
+    --pull: #3b8dff;
+    --legs: #35d07f;
+    --hyrox: #b06bff;
+    --rest: #6b7280;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--txt); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 90px) 0;
+    max-width: 640px; margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { padding: 0 16px; }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 16px 10px;
+  }
+  header .h-left { display: flex; flex-direction: column; gap: 2px; }
+  header .date { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: .3px; }
+  header .brand { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+  header .brand span { color: var(--accent); }
+  .gear {
+    width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--txt); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .goal-pill {
+    margin: 0 16px 14px; padding: 10px 14px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,91,59,.16), rgba(255,176,59,.10));
+    border: 1px solid rgba(255,91,59,.25);
+    font-size: 12.5px; color: #ffd9ce; font-weight: 600;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .goal-pill b { color: var(--accent2); }
+
+  /* Week strip */
+  .week {
+    display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px 14px;
+    scrollbar-width: none;
+  }
+  .week::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; min-width: 56px; padding: 10px 0; border-radius: 14px;
+    background: var(--card); border: 1px solid var(--line);
+    text-align: center; cursor: pointer; transition: transform .08s;
+  }
+  .chip:active { transform: scale(.95); }
+  .chip .dow { font-size: 15px; font-weight: 800; }
+  .chip .tag { font-size: 10px; color: var(--muted); margin-top: 3px; font-weight: 700; letter-spacing: .3px; }
+  .chip.today { box-shadow: 0 0 0 2px var(--accent) inset; }
+  .chip.active { background: var(--card2); border-color: var(--accent); }
+  .chip[data-tag="Push"] .tag { color: var(--push); }
+  .chip[data-tag="Pull"] .tag { color: var(--pull); }
+  .chip[data-tag="Legs"] .tag { color: var(--legs); }
+  .chip[data-tag="HYROX"] .tag { color: var(--hyrox); }
+  .chip[data-tag="Rest"] .tag { color: var(--rest); }
+
+  /* Day card */
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 18px; margin: 0 16px 14px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 19px; font-weight: 800; letter-spacing: -.3px; }
+  .card .dur { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 14px; }
+  .sec-label { font-size: 12px; font-weight: 800; color: var(--accent2); letter-spacing: .5px; margin: 16px 0 8px; }
+  .warmup { font-size: 13.5px; color: var(--muted); line-height: 1.55; background: var(--card2); padding: 10px 12px; border-radius: 12px; }
+
+  ul.ex { list-style: none; margin: 0; padding: 0; }
+  ul.ex li {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 11px 0; border-bottom: 1px solid var(--line);
+  }
+  ul.ex li:last-child { border-bottom: none; }
+  ul.ex .nm { font-weight: 700; font-size: 14.5px; }
+  ul.ex .sc { font-size: 12.5px; color: var(--muted); text-align: right; flex: 0 0 auto; max-width: 48%; }
+
+  .note { margin-top: 14px; font-size: 13px; color: #ffd9ce; background: rgba(255,91,59,.10);
+    border-left: 3px solid var(--accent); padding: 10px 12px; border-radius: 0 10px 10px 0; line-height: 1.5; }
+
+  .diet { margin: 0 16px 14px; }
+  .diet .sec-label { margin-top: 4px; }
+  .diet-item { display: flex; gap: 9px; align-items: center; padding: 8px 0; font-size: 13.5px; color: var(--muted); }
+
+  /* Log mode */
+  .log-ex {
+    background: var(--card2); border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px; margin-bottom: 10px;
+  }
+  .log-ex .head { display: flex; align-items: center; gap: 10px; }
+  .log-ex .head .nm { font-weight: 700; font-size: 14.5px; flex: 1; }
+  .log-ex .head .sc { font-size: 11.5px; color: var(--muted); }
+  .check {
+    width: 26px; height: 26px; flex: 0 0 auto; border-radius: 8px; border: 2px solid var(--line);
+    background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: transparent; font-size: 15px; font-weight: 900;
+  }
+  .check.on { background: var(--ok); border-color: var(--ok); color: #06281a; }
+  .sets { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+  .set-row { display: flex; gap: 7px; align-items: center; }
+  .set-row .idx { font-size: 11px; color: var(--muted); width: 22px; flex: 0 0 auto; }
+  .set-row input { flex: 1; min-width: 0; }
+  .set-row .unit { font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+  .set-row .del { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 0 4px; flex: 0 0 auto; }
+  input, textarea, select {
+    background: var(--bg); border: 1px solid var(--line); color: var(--txt);
+    border-radius: 10px; padding: 9px 11px; font-size: 15px; font-family: inherit;
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  .add-set { background: none; border: 1px dashed var(--line); color: var(--muted);
+    border-radius: 10px; padding: 8px; font-size: 12.5px; cursor: pointer; margin-top: 4px; }
+  .ex-note { width: 100%; margin-top: 8px; }
+
+  .session-box { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 0 16px 14px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+  .field textarea, .field input[type=text], .field input[type=date] { width: 100%; }
+  .rating { display: flex; gap: 6px; }
+  .rating .r { flex: 1; padding: 9px 0; text-align: center; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--bg); font-weight: 700; font-size: 13px; cursor: pointer; }
+  .rating .r.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Bottom bar */
+  .bottombar {
+    position: fixed; left: 0; right: 0; bottom: 0; max-width: 640px; margin: 0 auto;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(15,17,21,0), var(--bg) 30%);
+    display: flex; gap: 10px;
+  }
+  .btn { flex: 1; border: none; border-radius: 14px; padding: 15px; font-size: 15px; font-weight: 800;
+    cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost { background: var(--card2); color: var(--txt); border: 1px solid var(--line); flex: 0 0 auto; padding: 15px 18px; }
+  .btn:active { transform: scale(.98); }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: flex-end;
+    z-index: 50; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--card); width: 100%; max-width: 640px; margin: 0 auto;
+    border-radius: 20px 20px 0 0; padding: 20px 18px calc(24px + env(safe-area-inset-bottom)); }
+  .modal h3 { margin: 0 0 4px; font-size: 18px; }
+  .modal p { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin: 0 0 16px; }
+  .modal .field input { width: 100%; }
+  .modal .hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .modal .hint a { color: var(--accent2); }
+
+  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: #000; border: 1px solid var(--line); color: #fff; padding: 12px 18px;
+    border-radius: 12px; font-size: 13.5px; font-weight: 600; z-index: 99; opacity: 0;
+    transition: opacity .2s, transform .2s; pointer-events: none; max-width: 90%; text-align: center; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+  .toast.err { border-color: var(--accent); color: #ffd9ce; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="h-left">
+      <div class="date" id="todayLabel">—</div>
+      <div class="brand">운동<span>봇</span></div>
+    </div>
+    <button class="gear" id="gearBtn" aria-label="설정">⚙️</button>
+  </header>
+
+  <div class="goal-pill" id="goalPill"></div>
+
+  <div class="week" id="week"></div>
+
+  <!-- VIEW MODE -->
+  <div id="viewMode">
+    <div class="card" id="dayCard"></div>
+    <div class="diet">
+      <div class="sec-label">🥗 오늘 식단/생활 체크</div>
+      <div id="dietView"></div>
+    </div>
+  </div>
+
+  <!-- LOG MODE -->
+  <div id="logMode" style="display:none">
+    <div class="wrap">
+      <div class="sec-label">📝 본운동 기록</div>
+      <div id="logList"></div>
+    </div>
+    <div class="session-box">
+      <div class="field">
+        <label>날짜 (운동 한 날)</label>
+        <input type="date" id="logDate" />
+      </div>
+      <div class="field">
+        <label>컨디션 메모</label>
+        <input type="text" id="condition" placeholder="예: 전날 맥주, 컨디션 7할" />
+      </div>
+      <div class="field">
+        <label>워밍업</label>
+        <div class="diet-item"><span class="check" id="warmupChk"></span><span id="warmupTxt"></span></div>
+      </div>
+      <div class="field">
+        <label>종합 평가</label>
+        <div class="rating" id="rating"></div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>한 줄 평 / 다음 액션</label>
+        <textarea id="ratingNote" rows="2" placeholder="예: 인클라인 14kg 안정. 사레레 폼 교정 후 재개"></textarea>
+      </div>
+    </div>
+    <div class="diet">
+      <div class="sec-label">🥗 식단/생활 체크</div>
+      <div id="dietLog"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <button class="btn btn-primary" id="mainBtn">📝 오늘 운동 기록하기</button>
+    <button class="btn btn-ghost" id="cancelBtn" style="display:none">취소</button>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <h3>⚙️ GitHub 동기화 설정</h3>
+      <p>기록을 git에 자동 커밋합니다. 토큰은 이 기기 브라우저에만 저장돼요.</p>
+      <div class="field">
+        <label>저장소 (owner/repo)</label>
+        <input type="text" id="repoInput" placeholder="goedwin/workout-bot" />
+      </div>
+      <div class="field">
+        <label>브랜치</label>
+        <input type="text" id="branchInput" placeholder="main" />
+      </div>
+      <div class="field" style="margin-bottom:8px">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="tokenInput" placeholder="github_pat_..." />
+        <div class="hint">
+          Fine-grained PAT 권장 · <b>이 repo만</b> · 권한 <b>Contents: Read &amp; write</b><br/>
+          발급: github.com/settings/tokens?type=beta
+        </div>
+      </div>
+      <div class="bottombar" style="position:static; padding:6px 0 0; background:none;">
+        <button class="btn btn-primary" id="saveSettings">저장</button>
+        <button class="btn btn-ghost" id="closeSettings">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+const KEYS = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+const DOW_KR = { sunday:"일", monday:"월", tuesday:"화", wednesday:"수", thursday:"목", friday:"금", saturday:"토" };
+
+let DATA = null;       // workouts.json
+let viewKey = null;    // 보고 있는 요일 key
+let logMode = false;
+let session = null;    // 현재 기록 세션 객체
+
+const $ = (id) => document.getElementById(id);
+
+// ---------- 날짜 유틸 (로컬/KST 기준) ----------
+function todayKey() { return KEYS[new Date().getDay()]; }
+function fmtDate(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function dateToKey(isoStr) {
+  const d = new Date(isoStr + "T00:00:00");
+  return KEYS[d.getDay()];
+}
+
+// ---------- 설정 (localStorage) ----------
+const LS = {
+  get token(){ return localStorage.getItem("wb_token") || ""; },
+  set token(v){ localStorage.setItem("wb_token", v); },
+  get repo(){ return localStorage.getItem("wb_repo") || "goedwin/workout-bot"; },
+  set repo(v){ localStorage.setItem("wb_repo", v); },
+  get branch(){ return localStorage.getItem("wb_branch") || "main"; },
+  set branch(v){ localStorage.setItem("wb_branch", v); },
+};
+
+// ---------- 토스트 ----------
+let toastTimer = null;
+function toast(msg, isErr=false) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isErr ? " err" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = "toast"; }, isErr ? 4500 : 2500);
+}
+
+// ---------- 초기 로드 ----------
+async function init() {
+  try {
+    const res = await fetch("workouts.json?" + Date.now());
+    DATA = await res.json();
+  } catch (e) {
+    document.body.innerHTML = "<p style='padding:24px'>workouts.json 을 못 불러왔어요. (로컬에서 file:// 로 열면 막힐 수 있어요 — 서버로 띄우거나 GitHub Pages에서 확인하세요.)</p>";
+    return;
+  }
+
+  const now = new Date();
+  $("todayLabel").textContent = `${now.getMonth()+1}월 ${now.getDate()}일 (${DOW_KR[todayKey()]})`;
+  $("goalPill").innerHTML = `🎯 <b>목표</b> · ${DATA.meta.goal} · 단백질 ${DATA.meta.protein_target_g}g`;
+
+  viewKey = todayKey();
+  renderWeek();
+  renderView();
+  bindEvents();
+}
+
+// ---------- 주간 칩 ----------
+function renderWeek() {
+  const wk = $("week");
+  wk.innerHTML = "";
+  KEYS.slice(1).concat(KEYS[0]).forEach(key => {  // 월~일 순서
+    const d = DATA.days[key];
+    const el = document.createElement("div");
+    el.className = "chip" + (key === todayKey() ? " today" : "") + (key === viewKey ? " active" : "");
+    el.dataset.tag = d.tag;
+    el.innerHTML = `<div class="dow">${DOW_KR[key]}</div><div class="tag">${d.tag}</div>`;
+    el.onclick = () => { viewKey = key; if (logMode) enterLog(); else renderView(); renderWeek(); };
+    wk.appendChild(el);
+  });
+}
+
+// ---------- 보기 모드 ----------
+function renderView() {
+  const d = DATA.days[viewKey];
+  const card = $("dayCard");
+  let exHtml = d.main.map(ex =>
+    `<li><span class="nm">${ex.name}</span>${ex.scheme ? `<span class="sc">${ex.scheme}</span>` : ""}</li>`
+  ).join("");
+  card.innerHTML = `
+    <h2>${d.title}</h2>
+    <div class="dur">⏱ ${d.duration}</div>
+    ${d.warmup ? `<div class="sec-label">🔥 워밍업</div><div class="warmup">${d.warmup}</div>` : ""}
+    <div class="sec-label">📋 본운동</div>
+    <ul class="ex">${exHtml}</ul>
+    ${d.note ? `<div class="note">💡 ${d.note}</div>` : ""}
+  `;
+  $("dietView").innerHTML = DATA.daily_reminder.map(item =>
+    `<div class="diet-item"><span style="color:var(--accent)">•</span>${item}</div>`
+  ).join("");
+}
+
+// ---------- 기록 모드 ----------
+function loadSession(dateStr) {
+  const saved = localStorage.getItem("wb_log_" + dateStr);
+  if (saved) { try { return JSON.parse(saved); } catch(e){} }
+  return null;
+}
+
+function enterLog() {
+  logMode = true;
+  $("viewMode").style.display = "none";
+  $("logMode").style.display = "block";
+  $("mainBtn").textContent = "💾 저장하고 git에 올리기";
+  $("cancelBtn").style.display = "block";
+
+  const d = DATA.days[viewKey];
+  const dateStr = $("logDate").value || fmtDate(new Date());
+  $("logDate").value = dateStr;
+
+  // 세션 불러오기 or 새로 생성
+  session = loadSession(dateStr) || {
+    date: dateStr, day: viewKey, dayTitle: d.title,
+    condition: "", warmupDone: false, rating: 0, ratingNote: "",
+    exercises: {}, diet: {}
+  };
+  session.day = viewKey; session.dayTitle = d.title;
+
+  // 워밍업
+  $("warmupTxt").textContent = d.warmup || "(워밍업 없음)";
+  $("warmupChk").className = "check" + (session.warmupDone ? " on" : "");
+  $("warmupChk").textContent = session.warmupDone ? "✓" : "";
+
+  $("condition").value = session.condition || "";
+  $("ratingNote").value = session.ratingNote || "";
+
+  // 운동 리스트 (DOM 식별은 인덱스로 — 한글/공백 운동명 셀렉터 이슈 방지)
+  const list = $("logList");
+  list.innerHTML = "";
+  d.main.forEach((ex, i) => {
+    const exState = session.exercises[ex.name] || { done:false, sets:[], note:"" };
+    session.exercises[ex.name] = exState;
+    const box = document.createElement("div");
+    box.className = "log-ex";
+    box.innerHTML = `
+      <div class="head">
+        <button class="check ${exState.done ? "on":""}" data-ex="${i}">${exState.done ? "✓":""}</button>
+        <div class="nm">${esc(ex.name)}</div>
+        <div class="sc">${esc(ex.scheme || "")}</div>
+      </div>
+      <div class="sets" data-sets="${i}"></div>
+      <button class="add-set" data-add="${i}">+ 세트 추가</button>
+      <textarea class="ex-note" rows="1" data-note="${i}" placeholder="이 종목 메모">${esc(exState.note||"")}</textarea>
+    `;
+    list.appendChild(box);
+    renderSets(i);
+  });
+
+  // 평가 버튼
+  const rt = $("rating"); rt.innerHTML = "";
+  for (let i=1;i<=10;i++){
+    const b = document.createElement("div");
+    b.className = "r" + (session.rating===i ? " on":"");
+    b.textContent = i; b.onclick = () => { session.rating = i; enterLogSoft(); };
+    rt.appendChild(b);
+  }
+
+  // 식단 체크
+  $("dietLog").innerHTML = DATA.daily_reminder.map((item,i) =>
+    `<div class="diet-item"><span class="check ${session.diet[i]?"on":""}" data-diet="${i}">${session.diet[i]?"✓":""}</span>${item}</div>`
+  ).join("");
+
+  bindLogEvents();
+  renderWeek();
+}
+
+// rating만 다시 그리기(전체 재바인드 비용 절약)
+function enterLogSoft() {
+  const rt = $("rating");
+  [...rt.children].forEach((b,i) => b.className = "r" + (session.rating===(i+1) ? " on":""));
+}
+
+function exNameByIdx(i) { return DATA.days[viewKey].main[i].name; }
+
+function renderSets(i) {
+  const wrap = document.querySelector(`[data-sets="${i}"]`);
+  if (!wrap) return;
+  const sets = session.exercises[exNameByIdx(i)].sets;
+  wrap.innerHTML = sets.map((s,j) => `
+    <div class="set-row">
+      <span class="idx">${j+1}</span>
+      <input type="text" inputmode="decimal" value="${esc(s.w||"")}" data-w="${i}|${j}" placeholder="kg" />
+      <span class="unit">kg ×</span>
+      <input type="text" inputmode="numeric" value="${esc(s.r||"")}" data-r="${i}|${j}" placeholder="렙" />
+      <button class="del" data-del="${i}|${j}">×</button>
+    </div>
+  `).join("");
+}
+
+function bindLogEvents() {
+  document.querySelectorAll("[data-ex]").forEach(b => b.onclick = () => {
+    const e = session.exercises[exNameByIdx(+b.dataset.ex)];
+    e.done = !e.done; b.className = "check" + (e.done ? " on":""); b.textContent = e.done ? "✓":"";
+  });
+  document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
+    const i = +b.dataset.add; session.exercises[exNameByIdx(i)].sets.push({w:"",r:""}); renderSets(i); bindSetInputs();
+  });
+  document.querySelectorAll("[data-note]").forEach(t => t.oninput = () => {
+    session.exercises[exNameByIdx(+t.dataset.note)].note = t.value;
+  });
+  $("warmupChk").onclick = () => {
+    session.warmupDone = !session.warmupDone;
+    $("warmupChk").className = "check" + (session.warmupDone ? " on":""); $("warmupChk").textContent = session.warmupDone ? "✓":"";
+  };
+  $("condition").oninput = () => session.condition = $("condition").value;
+  $("ratingNote").oninput = () => session.ratingNote = $("ratingNote").value;
+  document.querySelectorAll("[data-diet]").forEach(b => b.onclick = () => {
+    const i = b.dataset.diet; session.diet[i] = !session.diet[i];
+    b.className = "check" + (session.diet[i] ? " on":""); b.textContent = session.diet[i] ? "✓":"";
+  });
+  $("logDate").onchange = () => { saveLocal(); enterLog(); };  // 날짜 바꾸면 그 날 세션 로드
+  bindSetInputs();
+}
+
+function bindSetInputs() {
+  document.querySelectorAll("[data-w]").forEach(inp => inp.oninput = () => {
+    const [i,j] = inp.dataset.w.split("|"); session.exercises[exNameByIdx(+i)].sets[+j].w = inp.value;
+  });
+  document.querySelectorAll("[data-r]").forEach(inp => inp.oninput = () => {
+    const [i,j] = inp.dataset.r.split("|"); session.exercises[exNameByIdx(+i)].sets[+j].r = inp.value;
+  });
+  document.querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
+    const [i,j] = b.dataset.del.split("|"); session.exercises[exNameByIdx(+i)].sets.splice(+j,1); renderSets(+i); bindSetInputs();
+  });
+}
+
+function exitLog() {
+  logMode = false;
+  $("logMode").style.display = "none";
+  $("viewMode").style.display = "block";
+  $("mainBtn").textContent = "📝 오늘 운동 기록하기";
+  $("cancelBtn").style.display = "none";
+  renderView(); renderWeek();
+}
+
+function saveLocal() {
+  if (!session) return;
+  localStorage.setItem("wb_log_" + session.date, JSON.stringify(session));
+}
+
+// ---------- 마크다운 생성 (Edwin 로그 스타일) ----------
+function buildMarkdown() {
+  const s = session;
+  const d = DATA.days[s.day];
+  const dow = DOW_KR[s.day];
+  let md = `# ${s.date} (${dow}) — ${d.title}\n\n`;
+
+  md += `## 컨디션\n${s.condition || "-"}\n\n`;
+  md += `## 워밍업\n${s.warmupDone ? (d.warmup || "완료") : "스킵"}\n\n`;
+
+  md += `## 메인 워크아웃\n`;
+  md += `| 종목 | 기록 | 완료 | 메모 |\n|------|------|:----:|------|\n`;
+  d.main.forEach(ex => {
+    const e = s.exercises[ex.name] || {sets:[],done:false,note:""};
+    const rec = e.sets.filter(x=>x.w||x.r).map(x => `${x.w||"?"}kg×${x.r||"?"}`).join(", ") || "-";
+    md += `| ${ex.name} | ${rec} | ${e.done?"✅":""} | ${e.note||""} |\n`;
+  });
+  md += `\n`;
+
+  md += `## 종합 평가: ${s.rating || "-"}/10\n${s.ratingNote || ""}\n\n`;
+
+  md += `## 식단/생활 체크\n`;
+  DATA.daily_reminder.forEach((item,i) => { md += `- [${s.diet[i]?"x":" "}] ${item}\n`; });
+
+  md += `\n---\n🤖 workout-bot web 에서 기록 · ${new Date().toLocaleString("ko-KR")}\n`;
+  return md;
+}
+
+// ---------- GitHub 커밋 ----------
+function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+
+async function commitToGitHub(path, content, message) {
+  const token = LS.token, repo = LS.repo, branch = LS.branch;
+  const api = `https://api.github.com/repos/${repo}/contents/${path}`;
+  const headers = { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" };
+
+  // 기존 파일 sha 조회
+  let sha = null;
+  const head = await fetch(`${api}?ref=${branch}`, { headers });
+  if (head.ok) { sha = (await head.json()).sha; }
+  else if (head.status !== 404) { throw new Error(`조회 실패 ${head.status}: ${await head.text()}`); }
+
+  const body = { message, content: b64(content), branch };
+  if (sha) body.sha = sha;
+  const res = await fetch(api, { method:"PUT", headers:{...headers,"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`커밋 실패 ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+async function save() {
+  saveLocal();
+  const md = buildMarkdown();
+  const path = `log/${session.date}.md`;
+
+  if (!LS.token) {
+    // 토큰 없으면 로컬 저장 + 마크다운 복사 폴백
+    try { await navigator.clipboard.writeText(md); toast("로컬 저장 완료 · 마크다운 복사됨 (토큰 설정 시 git 자동 커밋)"); }
+    catch(e){ toast("로컬 저장 완료 (토큰 설정하면 git 자동 커밋)"); }
+    return;
+  }
+
+  $("mainBtn").textContent = "⏳ git에 올리는 중...";
+  $("mainBtn").disabled = true;
+  try {
+    await commitToGitHub(path, md, `운동 기록 ${session.date} (${DOW_KR[session.day]})`);
+    toast("✅ git 커밋 완료 · " + path);
+    exitLog();
+  } catch (e) {
+    console.error(e);
+    toast("⚠️ " + e.message, true);
+  } finally {
+    $("mainBtn").disabled = false;
+    if (logMode) $("mainBtn").textContent = "💾 저장하고 git에 올리기";
+  }
+}
+
+// ---------- 설정 모달 ----------
+function openSettings() {
+  $("repoInput").value = LS.repo; $("branchInput").value = LS.branch; $("tokenInput").value = LS.token;
+  $("modalBg").classList.add("open");
+}
+function closeSettings() { $("modalBg").classList.remove("open"); }
+
+function bindEvents() {
+  $("gearBtn").onclick = openSettings;
+  $("closeSettings").onclick = closeSettings;
+  $("modalBg").onclick = (e) => { if (e.target === $("modalBg")) closeSettings(); };
+  $("saveSettings").onclick = () => {
+    LS.repo = $("repoInput").value.trim() || "goedwin/workout-bot";
+    LS.branch = $("branchInput").value.trim() || "main";
+    LS.token = $("tokenInput").value.trim();
+    closeSettings(); toast("설정 저장됨");
+  };
+  $("mainBtn").onclick = () => { if (logMode) save(); else enterLog(); };
+  $("cancelBtn").onclick = () => { saveLocal(); exitLog(); };
+}
+
+// ---------- escape 헬퍼 ----------
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+init();
+</script>
+</body>
+</html>
