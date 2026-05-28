@@ -134,6 +134,15 @@
   .add-set { background: none; border: 1px dashed var(--line); color: var(--muted);
     border-radius: 10px; padding: 8px; font-size: 12.5px; cursor: pointer; margin-top: 4px; }
   .ex-note { width: 100%; margin-top: 8px; }
+  .del-ex { background: none; border: none; color: var(--muted); font-size: 17px; cursor: pointer; padding: 0 2px; flex: 0 0 auto; }
+  .add-ex-row { display: flex; gap: 8px; margin: 4px 0 2px; }
+  .add-ex-row input { flex: 1; min-width: 0; }
+  .btn-add-ex { flex: 0 0 auto; background: var(--accent); color: #fff; border: none;
+    border-radius: 10px; padding: 0 16px; font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit; }
+  .btn-add-ex:active { transform: scale(.97); }
+  .log-ex.custom { border-color: rgba(255,91,59,.4); }
+  .log-ex .badge { font-size: 10px; font-weight: 800; color: var(--accent); background: rgba(255,91,59,.14);
+    border-radius: 6px; padding: 2px 6px; flex: 0 0 auto; }
 
   .session-box { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 0 16px 14px; }
   .field { margin-bottom: 14px; }
@@ -204,6 +213,10 @@
     <div class="wrap">
       <div class="sec-label">📝 본운동 기록</div>
       <div id="logList"></div>
+      <div class="add-ex-row">
+        <input type="text" id="newExName" placeholder="운동 종목 직접 추가 (예: 케이블 플라이)" />
+        <button class="btn-add-ex" id="addExBtn">+ 추가</button>
+      </div>
     </div>
     <div class="session-box">
       <div class="field">
@@ -390,9 +403,10 @@ function enterLog() {
   session = loadSession(dateStr) || {
     date: dateStr, day: viewKey, dayTitle: d.title,
     condition: "", warmupDone: false, rating: 0, ratingNote: "",
-    exercises: {}, diet: {}
+    exercises: {}, customExercises: [], diet: {}
   };
   session.day = viewKey; session.dayTitle = d.title;
+  if (!session.customExercises) session.customExercises = [];
 
   // 워밍업
   $("warmupTxt").textContent = d.warmup || "(워밍업 없음)";
@@ -403,18 +417,22 @@ function enterLog() {
   $("ratingNote").value = session.ratingNote || "";
 
   // 운동 리스트 (DOM 식별은 인덱스로 — 한글/공백 운동명 셀렉터 이슈 방지)
+  // 기본 종목(d.main) + 내가 추가한 종목(customExercises)
   const list = $("logList");
   list.innerHTML = "";
-  d.main.forEach((ex, i) => {
+  exEntries(viewKey, session).forEach((ex, i) => {
     const exState = session.exercises[ex.name] || { done:false, sets:[], note:"" };
     session.exercises[ex.name] = exState;
     const box = document.createElement("div");
-    box.className = "log-ex";
+    box.className = "log-ex" + (ex.custom ? " custom" : "");
+    const rightHtml = ex.custom
+      ? `<span class="badge">추가</span><button class="del-ex" data-delex="${i}" aria-label="종목 삭제">🗑</button>`
+      : `<div class="sc">${esc(ex.scheme || "")}</div>`;
     box.innerHTML = `
       <div class="head">
         <button class="check ${exState.done ? "on":""}" data-ex="${i}">${exState.done ? "✓":""}</button>
         <div class="nm">${esc(ex.name)}</div>
-        <div class="sc">${esc(ex.scheme || "")}</div>
+        ${rightHtml}
       </div>
       <div class="sets" data-sets="${i}"></div>
       <button class="add-set" data-add="${i}">+ 세트 추가</button>
@@ -448,7 +466,36 @@ function enterLogSoft() {
   [...rt.children].forEach((b,i) => b.className = "r" + (session.rating===(i+1) ? " on":""));
 }
 
-function exNameByIdx(i) { return DATA.days[viewKey].main[i].name; }
+// 기본 종목 + 추가 종목을 합친 순서 목록 (index 기반 DOM 식별에 사용)
+function exEntries(dayKey, sess) {
+  const base = DATA.days[dayKey].main.map(ex => ({ name: ex.name, scheme: ex.scheme || "", custom: false }));
+  const extra = (sess.customExercises || []).map(name => ({ name, scheme: "", custom: true }));
+  return base.concat(extra);
+}
+
+function exNameByIdx(i) { return exEntries(viewKey, session)[i].name; }
+
+function addCustomExercise() {
+  const inp = $("newExName");
+  const name = inp.value.trim();
+  if (!name) return;
+  const existing = exEntries(viewKey, session).map(e => e.name);
+  if (existing.includes(name)) { toast("이미 있는 종목이에요", true); return; }
+  session.customExercises.push(name);
+  session.exercises[name] = { done:false, sets:[{w:"",r:""}], note:"" };
+  inp.value = "";
+  saveLocal();
+  enterLog();
+}
+
+function delCustomExercise(i) {
+  const ex = exEntries(viewKey, session)[i];
+  if (!ex || !ex.custom) return;
+  delete session.exercises[ex.name];
+  session.customExercises = session.customExercises.filter(n => n !== ex.name);
+  saveLocal();
+  enterLog();
+}
 
 function renderSets(i) {
   const wrap = document.querySelector(`[data-sets="${i}"]`);
@@ -473,6 +520,9 @@ function bindLogEvents() {
   document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
     const i = +b.dataset.add; session.exercises[exNameByIdx(i)].sets.push({w:"",r:""}); renderSets(i); bindSetInputs();
   });
+  document.querySelectorAll("[data-delex]").forEach(b => b.onclick = () => delCustomExercise(+b.dataset.delex));
+  $("addExBtn").onclick = addCustomExercise;
+  $("newExName").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCustomExercise(); } };
   document.querySelectorAll("[data-note]").forEach(t => t.oninput = () => {
     session.exercises[exNameByIdx(+t.dataset.note)].note = t.value;
   });
@@ -528,10 +578,11 @@ function buildMarkdown() {
 
   md += `## 메인 워크아웃\n`;
   md += `| 종목 | 기록 | 완료 | 메모 |\n|------|------|:----:|------|\n`;
-  d.main.forEach(ex => {
+  exEntries(s.day, s).forEach(ex => {
     const e = s.exercises[ex.name] || {sets:[],done:false,note:""};
     const rec = e.sets.filter(x=>x.w||x.r).map(x => `${x.w||"?"}kg×${x.r||"?"}`).join(", ") || "-";
-    md += `| ${ex.name} | ${rec} | ${e.done?"✅":""} | ${e.note||""} |\n`;
+    const label = ex.custom ? `${ex.name} (추가)` : ex.name;
+    md += `| ${label} | ${rec} | ${e.done?"✅":""} | ${e.note||""} |\n`;
   });
   md += `\n`;
 
