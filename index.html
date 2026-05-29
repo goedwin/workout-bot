@@ -106,6 +106,20 @@
   .diet .sec-label { margin-top: 4px; }
   .diet-item { display: flex; gap: 9px; align-items: center; padding: 8px 0; font-size: 13.5px; color: var(--muted); }
 
+  /* 식단 기록 */
+  .meal-totals { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px; margin-bottom: 12px; }
+  .meal-totals .totline { font-size: 15px; font-weight: 700; margin-bottom: 9px; }
+  .meal-totals .totline b { color: var(--accent2); font-size: 18px; }
+  .meal-totals .totline .mut { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  .bar { height: 9px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 99px; transition: width .2s; }
+  .bar-fill.over { background: var(--ok); }
+  .meal-row { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
+  .meal-row .meal-menu { width: 100%; }
+  .meal-nums { display: flex; gap: 7px; align-items: center; margin-top: 8px; }
+  .meal-nums input { flex: 1; min-width: 0; }
+  .meal-nums .unit { font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+
   /* Log mode */
   .log-ex {
     background: var(--card2); border: 1px solid var(--line); border-radius: 14px;
@@ -227,8 +241,14 @@
         <textarea id="ratingNote" rows="2" placeholder="예: 인클라인 14kg 안정. 사레레 폼 교정 후 재개"></textarea>
       </div>
     </div>
+    <div class="wrap">
+      <div class="sec-label">🍽 오늘 먹은 것</div>
+      <div class="meal-totals" id="mealTotals"></div>
+      <div id="mealList"></div>
+      <button class="add-set" id="addMeal" style="width:100%">+ 식사 추가</button>
+    </div>
     <div class="diet">
-      <div class="sec-label">🥗 식단/생활 체크</div>
+      <div class="sec-label">🥗 식단/생활 룰 체크</div>
       <div id="dietLog"></div>
     </div>
   </div>
@@ -390,9 +410,10 @@ function enterLog() {
   session = loadSession(dateStr) || {
     date: dateStr, day: viewKey, dayTitle: d.title,
     condition: "", warmupDone: false, rating: 0, ratingNote: "",
-    exercises: {}, diet: {}
+    exercises: {}, diet: {}, meals: []
   };
   session.day = viewKey; session.dayTitle = d.title;
+  if (!session.meals) session.meals = [];  // 옛 세션 호환
 
   // 워밍업
   $("warmupTxt").textContent = d.warmup || "(워밍업 없음)";
@@ -433,13 +454,50 @@ function enterLog() {
     rt.appendChild(b);
   }
 
-  // 식단 체크
+  // 식단 기록
+  renderMeals();
+
+  // 식단/생활 룰 체크
   $("dietLog").innerHTML = DATA.daily_reminder.map((item,i) =>
     `<div class="diet-item"><span class="check ${session.diet[i]?"on":""}" data-diet="${i}">${session.diet[i]?"✓":""}</span>${item}</div>`
   ).join("");
 
   bindLogEvents();
   renderWeek();
+}
+
+// ---------- 식단 기록 ----------
+function renderMeals() {
+  $("mealList").innerHTML = session.meals.map((m,i) => `
+    <div class="meal-row">
+      <input type="text" class="meal-menu" data-mm="${i}" value="${esc(m.menu||"")}" placeholder="메뉴 (예: 삼겹살정식 + 밥)" />
+      <div class="meal-nums">
+        <input type="text" inputmode="numeric" data-mp="${i}" value="${esc(m.protein||"")}" placeholder="단백질" /><span class="unit">g</span>
+        <input type="text" inputmode="numeric" data-mk="${i}" value="${esc(m.kcal||"")}" placeholder="kcal" /><span class="unit">kcal</span>
+        <button class="del" data-md="${i}">×</button>
+      </div>
+    </div>
+  `).join("");
+  renderMealTotals();
+  bindMealRows();
+}
+
+function renderMealTotals() {
+  const pSum = Math.round(session.meals.reduce((a,m)=>a+(parseFloat(m.protein)||0),0));
+  const kSum = Math.round(session.meals.reduce((a,m)=>a+(parseFloat(m.kcal)||0),0));
+  const target = DATA.meta.protein_target_g || 154;
+  const pct = target ? Math.min(100, Math.round(pSum/target*100)) : 0;
+  $("mealTotals").innerHTML = `
+    <div class="totline">단백질 <b>${pSum}g</b> <span class="mut">/ ${target}g · ${kSum} kcal</span></div>
+    <div class="bar"><div class="bar-fill ${pSum>=target?"over":""}" style="width:${pct}%"></div></div>
+  `;
+}
+
+function bindMealRows() {
+  document.querySelectorAll("[data-mm]").forEach(inp => inp.oninput = () => { session.meals[+inp.dataset.mm].menu = inp.value; });
+  document.querySelectorAll("[data-mp]").forEach(inp => inp.oninput = () => { session.meals[+inp.dataset.mp].protein = inp.value; renderMealTotals(); });
+  document.querySelectorAll("[data-mk]").forEach(inp => inp.oninput = () => { session.meals[+inp.dataset.mk].kcal = inp.value; renderMealTotals(); });
+  document.querySelectorAll("[data-md]").forEach(b => b.onclick = () => { session.meals.splice(+b.dataset.md,1); renderMeals(); });
 }
 
 // rating만 다시 그리기(전체 재바인드 비용 절약)
@@ -482,6 +540,7 @@ function bindLogEvents() {
   };
   $("condition").oninput = () => session.condition = $("condition").value;
   $("ratingNote").oninput = () => session.ratingNote = $("ratingNote").value;
+  $("addMeal").onclick = () => { session.meals.push({menu:"",protein:"",kcal:""}); renderMeals(); };
   document.querySelectorAll("[data-diet]").forEach(b => b.onclick = () => {
     const i = b.dataset.diet; session.diet[i] = !session.diet[i];
     b.className = "check" + (session.diet[i] ? " on":""); b.textContent = session.diet[i] ? "✓":"";
@@ -537,7 +596,20 @@ function buildMarkdown() {
 
   md += `## 종합 평가: ${s.rating || "-"}/10\n${s.ratingNote || ""}\n\n`;
 
-  md += `## 식단/생활 체크\n`;
+  md += `## 식단\n`;
+  const meals = (s.meals || []).filter(m => m.menu || m.protein || m.kcal);
+  if (meals.length) {
+    md += `| 메뉴 | 단백질 | kcal |\n|------|:----:|:----:|\n`;
+    meals.forEach(m => { md += `| ${m.menu||"-"} | ${m.protein?m.protein+"g":"-"} | ${m.kcal||"-"} |\n`; });
+    const pSum = Math.round(meals.reduce((a,m)=>a+(parseFloat(m.protein)||0),0));
+    const kSum = Math.round(meals.reduce((a,m)=>a+(parseFloat(m.kcal)||0),0));
+    md += `| **합계** | **${pSum}g** | **${kSum}** |\n`;
+    md += `\n단백질 목표 ${DATA.meta.protein_target_g}g (${pSum>=DATA.meta.protein_target_g?"달성 ✅":`${DATA.meta.protein_target_g-pSum}g 부족`})\n\n`;
+  } else {
+    md += `(기록 없음)\n\n`;
+  }
+
+  md += `## 식단/생활 룰 체크\n`;
   DATA.daily_reminder.forEach((item,i) => { md += `- [${s.diet[i]?"x":" "}] ${item}\n`; });
 
   md += `\n---\n🤖 workout-bot web 에서 기록 · ${new Date().toLocaleString("ko-KR")}\n`;
