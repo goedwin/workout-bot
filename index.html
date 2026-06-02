@@ -58,6 +58,22 @@
   }
   .goal-pill b { color: var(--accent2); }
 
+  /* Body card (키/체중) */
+  .body-card {
+    margin: 0 16px 14px; padding: 12px 14px; border-radius: 14px;
+    background: var(--card); border: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .body-item { display: flex; align-items: center; gap: 6px; }
+  .body-item .bl { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .body-item .bu { font-size: 11px; color: var(--muted); }
+  .body-item b { font-size: 17px; font-weight: 800; }
+  .body-item input { width: 68px; text-align: center; padding: 7px 6px; font-size: 16px; font-weight: 700; }
+  .body-item.delta { font-size: 12px; font-weight: 700; margin-left: auto; }
+  .body-item.delta.down { color: var(--ok); }
+  .body-item.delta.up { color: var(--accent); }
+  input.cust-nm { flex: 1; min-width: 0; font-weight: 700; font-size: 14.5px; padding: 7px 9px; }
+
   /* Week strip */
   .week {
     display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px 14px;
@@ -202,6 +218,8 @@
 
   <div class="goal-pill" id="goalPill"></div>
 
+  <div class="body-card" id="bodyCard"></div>
+
   <div class="week" id="week"></div>
 
   <!-- VIEW MODE -->
@@ -218,6 +236,9 @@
     <div class="wrap">
       <div class="sec-label">📝 본운동 기록</div>
       <div id="logList"></div>
+      <div class="sec-label">➕ 추가 운동 (자유 입력)</div>
+      <div id="customList"></div>
+      <button class="add-set" id="addExercise" style="width:100%">+ 운동 추가</button>
     </div>
     <div class="session-box">
       <div class="field">
@@ -262,8 +283,13 @@
   <!-- SETTINGS MODAL -->
   <div class="modal-bg" id="modalBg">
     <div class="modal">
-      <h3>⚙️ GitHub 동기화 설정</h3>
-      <p>기록을 git에 자동 커밋합니다. 토큰은 이 기기 브라우저에만 저장돼요.</p>
+      <h3>⚙️ 설정</h3>
+      <p>키는 거의 안 바뀌니 여기서 1회 입력. 체중은 상단 카드에서 매일 갱신.</p>
+      <div class="field">
+        <label>키 (cm)</label>
+        <input type="text" inputmode="decimal" id="heightInput" placeholder="177" />
+      </div>
+      <p style="margin:16px 0 12px">아래는 기록을 git에 자동 커밋하는 설정. 토큰은 이 기기 브라우저에만 저장돼요.</p>
       <div class="field">
         <label>저장소 (owner/repo)</label>
         <input type="text" id="repoInput" placeholder="goedwin/workout-bot" />
@@ -321,7 +347,24 @@ const LS = {
   set repo(v){ localStorage.setItem("wb_repo", v); },
   get branch(){ return localStorage.getItem("wb_branch") || "main"; },
   set branch(v){ localStorage.setItem("wb_branch", v); },
+  get height(){ return localStorage.getItem("wb_height") || "177"; },
+  set height(v){ localStorage.setItem("wb_height", v); },
 };
+
+// ---------- 체중 기록 (날짜별, localStorage) ----------
+function getWeights() {
+  try { return JSON.parse(localStorage.getItem("wb_weights") || "{}"); } catch(e) { return {}; }
+}
+function setWeightFor(date, kg) {
+  const m = getWeights();
+  if (kg === "" || kg == null) delete m[date]; else m[date] = String(kg);
+  localStorage.setItem("wb_weights", JSON.stringify(m));
+}
+function prevWeight(date) {  // date 이전의 가장 최근 기록 (델타용)
+  const m = getWeights();
+  const ks = Object.keys(m).filter(k => k < date).sort();
+  return ks.length ? parseFloat(m[ks[ks.length-1]]) : null;
+}
 
 // ---------- 토스트 ----------
 let toastTimer = null;
@@ -349,8 +392,34 @@ async function init() {
 
   viewKey = todayKey();
   renderWeek();
+  renderBody();
   renderView();
   bindEvents();
+}
+
+// ---------- 키/체중 카드 ----------
+function renderBody() {
+  const today = fmtDate(new Date());
+  const w = getWeights()[today] || "";
+  const prev = prevWeight(today);
+  let deltaHtml = "";
+  if (w && prev != null) {
+    const diff = +(parseFloat(w) - prev).toFixed(1);
+    if (diff !== 0) {
+      const cls = diff < 0 ? "down" : "up";
+      deltaHtml = `<div class="body-item delta ${cls}">${diff < 0 ? "▼" : "▲"} ${Math.abs(diff)}kg</div>`;
+    }
+  }
+  $("bodyCard").innerHTML = `
+    <div class="body-item"><span class="bl">키</span><b>${esc(LS.height)}</b><span class="bu">cm</span></div>
+    <div class="body-item"><span class="bl">오늘 체중</span>
+      <input type="text" inputmode="decimal" id="weightInput" value="${esc(w)}" placeholder="--" /><span class="bu">kg</span></div>
+    ${deltaHtml}
+  `;
+  $("weightInput").oninput = () => {
+    setWeightFor(today, $("weightInput").value.trim());
+  };
+  $("weightInput").onblur = renderBody;  // 델타 갱신
 }
 
 // ---------- 주간 칩 ----------
@@ -410,10 +479,11 @@ function enterLog() {
   session = loadSession(dateStr) || {
     date: dateStr, day: viewKey, dayTitle: d.title,
     condition: "", warmupDone: false, rating: 0, ratingNote: "",
-    exercises: {}, diet: {}, meals: []
+    exercises: {}, customExercises: [], diet: {}, meals: []
   };
   session.day = viewKey; session.dayTitle = d.title;
-  if (!session.meals) session.meals = [];  // 옛 세션 호환
+  if (!session.meals) session.meals = [];              // 옛 세션 호환
+  if (!session.customExercises) session.customExercises = [];
 
   // 워밍업
   $("warmupTxt").textContent = d.warmup || "(워밍업 없음)";
@@ -445,6 +515,9 @@ function enterLog() {
     renderSets(i);
   });
 
+  // 추가 운동 (자유 입력)
+  renderCustomList();
+
   // 평가 버튼
   const rt = $("rating"); rt.innerHTML = "";
   for (let i=1;i<=10;i++){
@@ -466,14 +539,54 @@ function enterLog() {
   renderWeek();
 }
 
+// ---------- 식단 추정 (오프라인 키워드 DB · 1인분 기준, 수정 가능) ----------
+const FOOD_DB = [
+  { kw:["blt","샌드위치","샌드"], p:14, k:360 },
+  { kw:["김치찌개","돼지김치","김치찜"], p:24, k:380 },
+  { kw:["라면사리","사리","라면","면"], p:8, k:250 },
+  { kw:["그릭","요거트"], p:9, k:95 },
+  { kw:["오트밀","오트","뮤즐리"], p:3, k:70 },
+  { kw:["아몬드우유","아몬드브리즈","아몬드밀크"], p:1, k:30 },
+  { kw:["프로티너","프로틴","단백질파스타","고단백"], p:22, k:140 },
+  { kw:["크림파스타","파스타","스파게티","로제","알리오"], p:13, k:470 },
+  { kw:["부채살","채끝","안심","등심","소고기","스테이크","불고기"], p:26, k:240 },
+  { kw:["닭가슴","닭가슴살","치킨가슴","훈제닭"], p:23, k:120 },
+  { kw:["닭","치킨"], p:18, k:230 },
+  { kw:["계란","달걀","에그","난황"], p:6, k:78 },
+  { kw:["공기밥","쌀밥","흰밥","밥"], p:4, k:300 },
+  { kw:["고구마"], p:2, k:130 },
+  { kw:["바나나"], p:1, k:90 },
+  { kw:["우유","두유"], p:6, k:130 },
+  { kw:["연어","참치","고등어","생선"], p:22, k:210 },
+  { kw:["삼겹","목살","돼지"], p:21, k:330 },
+  { kw:["샐러드","채소"], p:4, k:120 },
+];
+
+function estimateMeal(menu) {
+  const t = (menu||"").toLowerCase().replace(/\s/g,"");
+  if (!t) return null;
+  const half = /반개|반인분|1\/2|하프/.test(menu);
+  let p=0, k=0, hit=false;
+  const used = new Set();
+  for (const f of FOOD_DB) {
+    const w = f.kw.find(x => t.includes(x.toLowerCase().replace(/\s/g,"")));
+    if (w && !used.has(f)) {      // 한 음식당 1회만 (중복 키워드 방지)
+      used.add(f); p += f.p; k += f.k; hit = true;
+    }
+  }
+  if (!hit) return null;
+  if (half) { p = Math.round(p*0.7); k = Math.round(k*0.7); }  // "반" 표기 시 보정
+  return { p: Math.round(p), k: Math.round(k) };
+}
+
 // ---------- 식단 기록 ----------
 function renderMeals() {
   $("mealList").innerHTML = session.meals.map((m,i) => `
     <div class="meal-row">
-      <input type="text" class="meal-menu" data-mm="${i}" value="${esc(m.menu||"")}" placeholder="메뉴 (예: 삼겹살정식 + 밥)" />
+      <input type="text" class="meal-menu" data-mm="${i}" value="${esc(m.menu||"")}" placeholder="메뉴만 적으면 자동추정 (예: 닭가슴살 200g)" />
       <div class="meal-nums">
         <input type="text" inputmode="numeric" data-mp="${i}" value="${esc(m.protein||"")}" placeholder="단백질" /><span class="unit">g</span>
-        <input type="text" inputmode="numeric" data-mk="${i}" value="${esc(m.kcal||"")}" placeholder="kcal" /><span class="unit">kcal</span>
+        <input type="text" inputmode="numeric" data-mk="${i}" value="${esc(m.kcal||"")}" placeholder="kcal" /><span class="unit">${m.est?'<span style="color:var(--accent2)">≈추정</span>':'kcal'}</span>
         <button class="del" data-md="${i}">×</button>
       </div>
     </div>
@@ -494,10 +607,81 @@ function renderMealTotals() {
 }
 
 function bindMealRows() {
-  document.querySelectorAll("[data-mm]").forEach(inp => inp.oninput = () => { session.meals[+inp.dataset.mm].menu = inp.value; });
-  document.querySelectorAll("[data-mp]").forEach(inp => inp.oninput = () => { session.meals[+inp.dataset.mp].protein = inp.value; renderMealTotals(); });
-  document.querySelectorAll("[data-mk]").forEach(inp => inp.oninput = () => { session.meals[+inp.dataset.mk].kcal = inp.value; renderMealTotals(); });
+  document.querySelectorAll("[data-mm]").forEach(inp => {
+    inp.oninput = () => { session.meals[+inp.dataset.mm].menu = inp.value; };
+    inp.onblur = () => {   // 메뉴 입력 끝나면 비어있거나 추정값이던 칸을 자동 추정
+      const m = session.meals[+inp.dataset.mm];
+      if (m.menu && (m.est || (!m.protein && !m.kcal))) {
+        const e = estimateMeal(m.menu);
+        if (e) { m.protein = String(e.p); m.kcal = String(e.k); m.est = true; renderMeals(); }
+      }
+    };
+  });
+  document.querySelectorAll("[data-mp]").forEach(inp => inp.oninput = () => { const m=session.meals[+inp.dataset.mp]; m.protein = inp.value; m.est = false; renderMealTotals(); });
+  document.querySelectorAll("[data-mk]").forEach(inp => inp.oninput = () => { const m=session.meals[+inp.dataset.mk]; m.kcal = inp.value; m.est = false; renderMealTotals(); });
   document.querySelectorAll("[data-md]").forEach(b => b.onclick = () => { session.meals.splice(+b.dataset.md,1); renderMeals(); });
+}
+
+// ---------- 추가 운동 (자유 입력) ----------
+function renderCustomList() {
+  const wrap = $("customList");
+  wrap.innerHTML = session.customExercises.map((ex,c) => `
+    <div class="log-ex">
+      <div class="head">
+        <button class="check ${ex.done ? "on":""}" data-cex="${c}">${ex.done ? "✓":""}</button>
+        <input type="text" class="cust-nm" data-cnm="${c}" value="${esc(ex.name||"")}" placeholder="운동 이름 (예: 레그프레스)" />
+        <button class="del" data-crm="${c}">×</button>
+      </div>
+      <div class="sets" data-csets="${c}"></div>
+      <button class="add-set" data-cadd="${c}">+ 세트 추가</button>
+      <textarea class="ex-note" rows="1" data-cnote="${c}" placeholder="이 종목 메모">${esc(ex.note||"")}</textarea>
+    </div>
+  `).join("");
+  session.customExercises.forEach((_,c) => renderCSets(c));
+  bindCustomEvents();
+}
+
+function renderCSets(c) {
+  const wrap = document.querySelector(`[data-csets="${c}"]`);
+  if (!wrap) return;
+  const sets = session.customExercises[c].sets;
+  wrap.innerHTML = sets.map((s,j) => `
+    <div class="set-row">
+      <span class="idx">${j+1}</span>
+      <input type="text" inputmode="decimal" value="${esc(s.w||"")}" data-cw="${c}|${j}" placeholder="kg" />
+      <span class="unit">kg ×</span>
+      <input type="text" inputmode="numeric" value="${esc(s.r||"")}" data-cr="${c}|${j}" placeholder="렙" />
+      <button class="del" data-cdel="${c}|${j}">×</button>
+    </div>
+  `).join("");
+}
+
+function bindCustomEvents() {
+  document.querySelectorAll("[data-cex]").forEach(b => b.onclick = () => {
+    const ex = session.customExercises[+b.dataset.cex];
+    ex.done = !ex.done; b.className = "check" + (ex.done ? " on":""); b.textContent = ex.done ? "✓":"";
+  });
+  document.querySelectorAll("[data-cnm]").forEach(inp => inp.oninput = () => {
+    session.customExercises[+inp.dataset.cnm].name = inp.value;
+  });
+  document.querySelectorAll("[data-crm]").forEach(b => b.onclick = () => {
+    session.customExercises.splice(+b.dataset.crm,1); renderCustomList();
+  });
+  document.querySelectorAll("[data-cadd]").forEach(b => b.onclick = () => {
+    const c = +b.dataset.cadd; session.customExercises[c].sets.push({w:"",r:""}); renderCSets(c); bindCustomEvents();
+  });
+  document.querySelectorAll("[data-cnote]").forEach(t => t.oninput = () => {
+    session.customExercises[+t.dataset.cnote].note = t.value;
+  });
+  document.querySelectorAll("[data-cw]").forEach(inp => inp.oninput = () => {
+    const [c,j] = inp.dataset.cw.split("|"); session.customExercises[+c].sets[+j].w = inp.value;
+  });
+  document.querySelectorAll("[data-cr]").forEach(inp => inp.oninput = () => {
+    const [c,j] = inp.dataset.cr.split("|"); session.customExercises[+c].sets[+j].r = inp.value;
+  });
+  document.querySelectorAll("[data-cdel]").forEach(b => b.onclick = () => {
+    const [c,j] = b.dataset.cdel.split("|"); session.customExercises[+c].sets.splice(+j,1); renderCSets(+c); bindCustomEvents();
+  });
 }
 
 // rating만 다시 그리기(전체 재바인드 비용 절약)
@@ -541,6 +725,10 @@ function bindLogEvents() {
   $("condition").oninput = () => session.condition = $("condition").value;
   $("ratingNote").oninput = () => session.ratingNote = $("ratingNote").value;
   $("addMeal").onclick = () => { session.meals.push({menu:"",protein:"",kcal:""}); renderMeals(); };
+  $("addExercise").onclick = () => {
+    session.customExercises.push({ name:"", sets:[{w:"",r:""}], done:false, note:"" });
+    renderCustomList();
+  };
   document.querySelectorAll("[data-diet]").forEach(b => b.onclick = () => {
     const i = b.dataset.diet; session.diet[i] = !session.diet[i];
     b.className = "check" + (session.diet[i] ? " on":""); b.textContent = session.diet[i] ? "✓":"";
@@ -582,6 +770,8 @@ function buildMarkdown() {
   const dow = DOW_KR[s.day];
   let md = `# ${s.date} (${dow}) — ${d.title}\n\n`;
 
+  const w = getWeights()[s.date];
+  md += `## 체중\n${w ? w + "kg" : "-"}\n\n`;
   md += `## 컨디션\n${s.condition || "-"}\n\n`;
   md += `## 워밍업\n${s.warmupDone ? (d.warmup || "완료") : "스킵"}\n\n`;
 
@@ -591,6 +781,12 @@ function buildMarkdown() {
     const e = s.exercises[ex.name] || {sets:[],done:false,note:""};
     const rec = e.sets.filter(x=>x.w||x.r).map(x => `${x.w||"?"}kg×${x.r||"?"}`).join(", ") || "-";
     md += `| ${ex.name} | ${rec} | ${e.done?"✅":""} | ${e.note||""} |\n`;
+  });
+  (s.customExercises || []).forEach(ex => {
+    const hasData = ex.name || ex.sets.some(x => x.w || x.r);
+    if (!hasData) return;
+    const rec = ex.sets.filter(x=>x.w||x.r).map(x => `${x.w||"?"}kg×${x.r||"?"}`).join(", ") || "-";
+    md += `| ${ex.name || "(이름없음)"} ➕ | ${rec} | ${ex.done?"✅":""} | ${ex.note||""} |\n`;
   });
   md += `\n`;
 
@@ -653,6 +849,13 @@ async function save() {
   $("mainBtn").disabled = true;
   try {
     await commitToGitHub(path, md, `운동 기록 ${session.date} (${DOW_KR[session.day]})`);
+    // 체중 추세 파일도 같이 갱신 (실패해도 운동 기록엔 영향 없음)
+    try {
+      const weights = getWeights();
+      if (Object.keys(weights).length) {
+        await commitToGitHub("weights.json", JSON.stringify(weights, null, 2), `체중 기록 ${session.date}`);
+      }
+    } catch(e) { console.warn("weights.json 커밋 스킵:", e); }
     toast("✅ git 커밋 완료 · " + path);
     exitLog();
   } catch (e) {
@@ -666,6 +869,7 @@ async function save() {
 
 // ---------- 설정 모달 ----------
 function openSettings() {
+  $("heightInput").value = LS.height;
   $("repoInput").value = LS.repo; $("branchInput").value = LS.branch; $("tokenInput").value = LS.token;
   $("modalBg").classList.add("open");
 }
@@ -676,10 +880,11 @@ function bindEvents() {
   $("closeSettings").onclick = closeSettings;
   $("modalBg").onclick = (e) => { if (e.target === $("modalBg")) closeSettings(); };
   $("saveSettings").onclick = () => {
+    LS.height = $("heightInput").value.trim() || "177";
     LS.repo = $("repoInput").value.trim() || "goedwin/workout-bot";
     LS.branch = $("branchInput").value.trim() || "main";
     LS.token = $("tokenInput").value.trim();
-    closeSettings(); toast("설정 저장됨");
+    closeSettings(); renderBody(); toast("설정 저장됨");
   };
   $("mainBtn").onclick = () => { if (logMode) save(); else enterLog(); };
   $("cancelBtn").onclick = () => { saveLocal(); exitLog(); };
